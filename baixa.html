@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#1a1a1a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Baixa Frios">
+<title>Baixa de Frios</title>
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="android-chrome-192x192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="android-chrome-512x512.png">
+<link rel="manifest" href="baixa.webmanifest">
+<link rel="stylesheet" href="https://unpkg.com/@tabler/icons-webfont@3.10.0/dist/tabler-icons.min.css">
+
+<script>
+  // ===== CONFIGURAÇÃO: Google Apps Script (planilha como banco de dados) =====
+  const SHEETS_API_URL = "https://script.google.com/macros/s/AKfycbyZx1TQ46O8BmdZH7ZxO4fh8Prrc8rDXsq47gcPPDG1EWnnoVlvkfYhM4-8CIIAGceW/exec";
+
+  function tentarCarregar(){
+    if(typeof carregar === 'function') carregar();
+    else setTimeout(tentarCarregar, 50);
+  }
+  if(document.readyState === 'loading'){
+    window.addEventListener('DOMContentLoaded', tentarCarregar);
+  } else {
+    tentarCarregar();
+  }
+</script>
+
+<script>
+  // ===== IDENTIFICAÇÃO (sem senha — só marca quem está pesando/dando baixa) =====
+  const NOMES_FUNCIONARIOS = ['Leonardo','Taiti','Wagner','Outro'];
+  const LOGIN_STORAGE_KEY = 'frios_baixa_usuario';
+
+  function storageGet(key){ try{ return sessionStorage.getItem(key); }catch(e){ return window['_mem_'+key] || null; } }
+  function storageSet(key,val){ try{ sessionStorage.setItem(key,val); }catch(e){ window['_mem_'+key] = val; } }
+
+  function liberarAcesso(nome){
+    document.getElementById('login-overlay').style.display = 'none';
+    document.getElementById('app-conteudo').style.display = 'block';
+    const respEl = document.getElementById('baixa-resp');
+    if(respEl && nome && nome !== 'Outro') respEl.value = nome;
+  }
+
+  function selecionarUsuario(nome){
+    if(nome === 'Outro'){
+      const digitado = prompt('Digite seu nome:');
+      if(!digitado) return;
+      storageSet(LOGIN_STORAGE_KEY, digitado.trim());
+      liberarAcesso(digitado.trim());
+      return;
+    }
+    storageSet(LOGIN_STORAGE_KEY, nome);
+    liberarAcesso(nome);
+  }
+
+  (function verificarLoginExistente(){
+    const usuarioSalvo = storageGet(LOGIN_STORAGE_KEY);
+    if(usuarioSalvo){
+      liberarAcesso(usuarioSalvo);
+    }
+  })();
+</script>
+
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#1a1a1a;--bg2:#222;--bg3:#2a2a2a;--bg4:#333;
+  --text:#e8e8e8;--text2:#aaa;--text3:#666;
+  --border:#3a3a3a;
+  --accent:#e8241a;--accent2:#b81a12;
+  --green:#4caf50;--green-bg:#1a2e1a;--green-text:#4caf50;
+  --red:#e05252;--red-bg:#2e1a1a;--red-text:#e05252;
+  --yellow:#e0a020;--yellow-bg:#2e2510;--yellow-text:#e0a020;
+  --blue:#5b9bd5;
+  --r:12px;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  background:var(--bg);color:var(--text);font-size:14px;
+  min-height:100vh;max-width:480px;margin:0 auto;
+  overflow-x:hidden;-webkit-tap-highlight-color:transparent;
+  padding-bottom:24px;
+}
+
+/* ═══════ LOGIN ═══════ */
+.login-overlay{position:fixed;inset:0;background:radial-gradient(circle at 50% 30%,#241414 0%,#181010 60%,var(--bg) 100%);display:flex;align-items:center;justify-content:center;z-index:1000;padding:20px;}
+.login-card{background:#1c1c1c;border:1px solid var(--border);border-radius:16px;padding:34px 28px;width:100%;max-width:360px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.5);}
+.login-icon{margin-bottom:14px;display:flex;justify-content:center;}
+.app-logo{width:34px;height:34px;flex-shrink:0;}
+.login-eyebrow{font-size:11px;letter-spacing:.12em;color:var(--text2);font-weight:600;margin-bottom:6px;}
+.login-title{font-size:19px;font-weight:700;color:var(--text);margin-bottom:6px;}
+.login-sub{font-size:13px;color:var(--text2);margin-bottom:24px;}
+.login-avatars{display:flex;justify-content:center;gap:18px;margin-bottom:8px;flex-wrap:wrap;}
+.login-avatar{cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:8px;}
+.login-avatar-circle{width:58px;height:58px;border-radius:50%;background:linear-gradient(160deg,var(--accent),var(--accent2));color:#fff;font-size:22px;font-weight:700;display:flex;align-items:center;justify-content:center;transition:transform .15s;}
+.login-avatar:active .login-avatar-circle{transform:scale(0.94);}
+.login-avatar-nome{font-size:12px;color:var(--text2);}
+.login-senha-box{display:none;margin-top:6px;}
+.login-senha-box.show{display:block;}
+.login-senha-usuario{font-size:14px;font-weight:600;color:var(--text);margin-bottom:14px;}
+.login-senha-input{width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:13px 12px;border-radius:10px;font-size:16px;text-align:center;letter-spacing:.1em;outline:none;}
+.login-senha-input:focus{border-color:var(--accent);}
+.login-senha-erro{color:var(--red-text);font-size:12px;min-height:16px;margin-top:8px;}
+.login-senha-botoes{display:flex;gap:10px;margin-top:10px;}
+.login-btn-voltar{flex:1;background:var(--bg3);border:1px solid var(--border);color:var(--text2);padding:12px;border-radius:10px;cursor:pointer;font-size:13px;}
+.login-btn-entrar{flex:2;background:linear-gradient(160deg,var(--accent),var(--accent2));border:none;color:#fff;padding:12px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:700;}
+.login-footer{font-size:11px;color:var(--text3);margin-top:26px;}
+.app-conteudo-protegido{display:none;}
+
+/* ═══════ OFFLINE / SYNC BAR ═══════ */
+.offline-bar{display:none;background:var(--yellow);color:#000;font-size:12px;font-weight:700;padding:7px 20px;text-align:center;}
+.offline-bar.show{display:block;}
+
+/* ═══════ HEADER ═══════ */
+.hdr{display:flex;align-items:center;justify-content:space-between;padding:14px 16px 12px;position:sticky;top:0;background:var(--bg);z-index:20;border-bottom:1px solid var(--border);gap:10px;}
+.hdr-left{display:flex;align-items:center;gap:10px;min-width:0;}
+.hdr-title{font-size:15px;font-weight:700;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.hdr-sub{font-size:11px;color:var(--text2);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.save-status{font-size:10px;color:var(--text3);display:flex;align-items:center;gap:5px;flex-shrink:0;white-space:nowrap;}
+.status-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#888;flex-shrink:0;}
+.hdr-btn{width:38px;height:38px;border-radius:10px;border:1px solid var(--border);background:var(--bg2);color:var(--text2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;}
+
+/* ═══════ SUMMARY CARDS ═══════ */
+.cards{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);border:1px solid var(--border);border-radius:var(--r);margin:14px 16px;overflow:hidden;}
+.card-m{background:var(--bg2);padding:14px 16px;}
+.card-m .label{font-size:11px;color:var(--text2);margin-bottom:4px;}
+.card-m .val{font-size:24px;font-weight:700;}
+.val-white{color:var(--text);}
+.val-green{color:var(--green);}
+.val-yellow{color:var(--yellow);}
+.val-red{color:var(--red);}
+
+/* ═══════ SECTIONS ═══════ */
+.section{display:none;padding:0 16px 20px;}
+.section.active{display:block;}
+.sec-hdr{display:flex;align-items:center;justify-content:space-between;margin:2px 0 12px;}
+.sec-hdr h2{font-size:13px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;}
+
+/* ═══════ FORM CARD ═══════ */
+.form-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:16px;margin-bottom:14px;}
+.form-card h3{font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:12px;}
+.field{margin-bottom:12px;}
+.field:last-child{margin-bottom:0;}
+.field label{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;letter-spacing:.04em;color:var(--text2);text-transform:uppercase;margin-bottom:6px;}
+.field-row{display:flex;gap:8px;align-items:flex-end;}
+.field-row .field{flex:1;margin-bottom:0;}
+.field input,.field select{width:100%;height:46px;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:0 12px;border-radius:9px;font-size:15px;outline:none;-webkit-appearance:none;appearance:none;}
+.field input:focus,.field select:focus{border-color:var(--accent);}
+.field select option{background:var(--bg2);}
+.scan-btn-inline{width:46px;height:46px;flex-shrink:0;background:var(--accent);border:none;color:#fff;border-radius:9px;font-size:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;}
+.scan-btn-inline:active{background:var(--accent2);}
+
+.btn-primary{width:100%;background:linear-gradient(160deg,var(--accent),var(--accent2));border:none;color:#fff;padding:13px;border-radius:10px;cursor:pointer;font-size:14px;font-weight:700;margin-top:4px;}
+.btn-primary:active{filter:brightness(0.92);}
+.btn-secondary{width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:13px;border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;}
+.btn-scan-big{width:100%;background:var(--bg3);border:2px dashed var(--accent);color:var(--accent);padding:20px;border-radius:var(--r);cursor:pointer;font-size:15px;font-weight:700;display:flex;flex-direction:column;align-items:center;gap:8px;margin-bottom:14px;}
+.btn-scan-big i{font-size:30px;}
+.btn-danger{background:var(--red-bg);border:1px solid #5a2a2a;color:var(--red-text);padding:10px;border-radius:9px;cursor:pointer;font-size:13px;width:100%;}
+
+.msg{padding:10px 14px;border-radius:9px;font-size:13px;margin-bottom:12px;display:none;}
+.msg.show{display:block;}
+.msg-ok{background:var(--green-bg);color:var(--green-text);border:1px solid #2a4a2a;}
+.msg-err{background:var(--red-bg);color:var(--red-text);border:1px solid #4a2a2a;}
+
+.upc-box{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:14px;margin:10px 0;display:none;}
+.upc-box.show{display:block;}
+.upc-row{display:flex;justify-content:space-between;padding:4px 0;font-size:13px;gap:10px;}
+.upc-row span:first-child{color:var(--text2);flex-shrink:0;}
+.upc-row span:last-child{font-weight:600;text-align:right;}
+
+/* ═══════ CARD LIST (substitui tabelas) ═══════ */
+.item-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:13px 14px;margin-bottom:10px;}
+.item-card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px;}
+.item-nome{font-size:14px;font-weight:700;line-height:1.3;}
+.item-cod{font-size:11px;color:var(--text2);margin-top:2px;}
+.item-meta{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;font-size:12px;color:var(--text2);align-items:center;}
+.item-meta strong{color:var(--text);font-weight:700;}
+.badge{display:inline-block;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:700;}
+.b-ok{background:var(--green-bg);color:var(--green-text);}
+.b-zero{background:var(--red-bg);color:var(--red-text);}
+.b-low{background:var(--yellow-bg);color:var(--yellow-text);}
+.b-venc{background:var(--red-bg);color:var(--red-text);}
+.b-entry{background:#1a2535;color:#5b9bd5;}
+.b-baixa{background:var(--yellow-bg);color:var(--yellow-text);}
+.item-actions{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;}
+.btn-sm{background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 4px;border-radius:8px;cursor:pointer;font-size:11px;text-align:center;}
+.btn-sm.danger{background:var(--red-bg);color:var(--red-text);border-color:#5a2a2a;}
+.empty-state{text-align:center;color:var(--text3);padding:30px 10px;font-size:13px;}
+
+.preco-row{display:flex;gap:8px;align-items:center;margin-top:8px;}
+.preco-row input{flex:1;height:42px;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:0 10px;border-radius:8px;font-size:14px;}
+.preco-row button{height:42px;padding:0 14px;background:linear-gradient(160deg,var(--accent),var(--accent2));border:none;color:#fff;border-radius:8px;font-size:12px;font-weight:700;}
+
+/* ═══════ BOTTOM NAV ═══════ */
+.bottom-nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:var(--bg2);border-top:1px solid var(--border);display:flex;z-index:30;padding-bottom:env(safe-area-inset-bottom);}
+.nav-btn{flex:1;background:none;border:none;color:var(--text3);padding:9px 2px 8px;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;font-size:9.5px;font-weight:600;letter-spacing:.01em;}
+.nav-btn i{font-size:20px;}
+.nav-btn.active{color:var(--accent);}
+
+/* ═══════ SCANNER MODAL ═══════ */
+.scanner-modal{position:fixed;inset:0;background:#000;z-index:500;display:none;flex-direction:column;}
+.scanner-modal.open{display:flex;}
+.scan-topbar{display:flex;align-items:center;justify-content:space-between;padding:16px;color:#fff;position:relative;z-index:5;}
+.scan-topbar span{font-size:14px;font-weight:600;}
+.scan-close{width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.15);border:none;color:#fff;font-size:18px;display:flex;align-items:center;justify-content:center;}
+.scan-body{flex:1;position:relative;background:#000;overflow:hidden;}
+#scannerView{position:absolute;inset:0;width:100%;height:100%;overflow:hidden;}
+#scannerView video{width:100%!important;height:100%!important;object-fit:cover!important;display:block!important;position:absolute;inset:0;}
+.corner{position:absolute;width:30px;height:30px;border-color:var(--accent);border-style:solid;}
+.corner.tl{top:60px;left:24px;border-width:3px 0 0 3px;border-radius:5px 0 0 0;}
+.corner.tr{top:60px;right:24px;border-width:3px 3px 0 0;border-radius:0 5px 0 0;}
+.corner.bl{bottom:60px;left:24px;border-width:0 0 3px 3px;border-radius:0 0 0 5px;}
+.corner.br{bottom:60px;right:24px;border-width:0 3px 3px 0;border-radius:0 0 5px 0;}
+.laser{position:absolute;left:34px;right:34px;height:2px;pointer-events:none;background:linear-gradient(90deg,transparent,var(--accent) 20%,var(--accent) 80%,transparent);box-shadow:0 0 6px var(--accent),0 0 18px rgba(232,36,26,.5);animation:laserSweep 2.2s ease-in-out infinite;display:none;}
+@keyframes laserSweep{0%,100%{top:22%;opacity:.7}50%{top:76%;opacity:1}}
+.scan-state{position:absolute;inset:0;background:rgba(20,20,20,.94);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;padding:24px;}
+.scan-state-icon{font-size:40px;line-height:1;color:#fff;}
+.scan-state-txt{font-size:13px;color:#bbb;line-height:1.5;}
+.scan-start-btn{padding:13px 34px;background:var(--accent);color:#fff;font-weight:700;font-size:15px;border:none;border-radius:30px;cursor:pointer;}
+.scan-flash{position:absolute;inset:0;background:var(--accent);opacity:0;pointer-events:none;transition:opacity .06s;}
+.scan-flash.show{opacity:.4;}
+.scan-hint{padding:14px 20px 26px;color:#ccc;font-size:12px;text-align:center;}
+.scan-manual-toggle{color:var(--accent);font-size:12px;text-align:center;padding-bottom:10px;cursor:pointer;text-decoration:underline;}
+</style>
+</head><body>
+
+<div class="offline-bar" id="offlineBar">⚠️ Sem conexão — verifique sua internet</div>
+
+<!-- ═══════ LOGIN ═══════ -->
+<div id="login-overlay" class="login-overlay">
+  <div class="login-card">
+    <div class="login-icon">
+      <svg class="app-logo" width="56" height="64" viewBox="0 0 200 230" xmlns="http://www.w3.org/2000/svg">
+        <path d="M100 8 L172 32 L172 108 Q172 178 100 218 Q28 178 28 108 L28 32 Z" fill="#2b2b2b" stroke="#e8241a" stroke-width="10" stroke-linejoin="round"/>
+        <g transform="translate(72,78)">
+          <path d="M0 8 L38 0 L52 9 L52 56 Q52 60 48 60 L4 60 Q0 60 0 56 Z" fill="#f2f6d8" stroke="#3a3a2a" stroke-width="2"/>
+          <circle cx="12" cy="19" r="3.6" fill="#2b2b2b"/>
+          <circle cx="33" cy="16" r="3" fill="#2b2b2b"/>
+          <circle cx="22" cy="35" r="3.2" fill="#2b2b2b"/>
+          <circle cx="41" cy="37" r="4" fill="#2b2b2b"/>
+          <circle cx="8" cy="45" r="2.6" fill="#2b2b2b"/>
+        </g>
+      </svg>
+    </div>
+    <div class="login-eyebrow">ESCUDO PADARIA</div>
+    <div class="login-title">Baixa de Frios</div>
+    <div class="login-sub" id="login-step1-sub">Quem está pesando/dando baixa?</div>
+
+    <div id="login-avatars" class="login-avatars">
+      <div class="login-avatar" onclick="selecionarUsuario('Leonardo')">
+        <div class="login-avatar-circle">L</div>
+        <div class="login-avatar-nome">Leonardo</div>
+      </div>
+      <div class="login-avatar" onclick="selecionarUsuario('Taiti')">
+        <div class="login-avatar-circle">T</div>
+        <div class="login-avatar-nome">Taiti</div>
+      </div>
+      <div class="login-avatar" onclick="selecionarUsuario('Wagner')">
+        <div class="login-avatar-circle">W</div>
+        <div class="login-avatar-nome">Wagner</div>
+      </div>
+      <div class="login-avatar" onclick="selecionarUsuario('Outro')">
+        <div class="login-avatar-circle">+</div>
+        <div class="login-avatar-nome">Outro</div>
+      </div>
+    </div>
+
+    <div class="login-footer">Toque no seu nome para começar a dar baixa</div>
+  </div>
+</div>
+
+<!-- ═══════ APP ═══════ -->
+<div id="app-conteudo" class="app-conteudo-protegido">
+
+  <div class="hdr">
+    <div class="hdr-left">
+      <svg class="app-logo" width="26" height="30" viewBox="0 0 200 230" xmlns="http://www.w3.org/2000/svg">
+        <path d="M100 8 L172 32 L172 108 Q172 178 100 218 Q28 178 28 108 L28 32 Z" fill="#2b2b2b" stroke="#e8241a" stroke-width="10" stroke-linejoin="round"/>
+        <g transform="translate(72,78)">
+          <path d="M0 8 L38 0 L52 9 L52 56 Q52 60 48 60 L4 60 Q0 60 0 56 Z" fill="#f2f6d8" stroke="#3a3a2a" stroke-width="2"/>
+          <circle cx="12" cy="19" r="3.6" fill="#2b2b2b"/><circle cx="33" cy="16" r="3" fill="#2b2b2b"/>
+          <circle cx="22" cy="35" r="3.2" fill="#2b2b2b"/><circle cx="41" cy="37" r="4" fill="#2b2b2b"/>
+          <circle cx="8" cy="45" r="2.6" fill="#2b2b2b"/>
+        </g>
+      </svg>
+      <div style="min-width:0;">
+        <div class="hdr-title">Baixa de Frios</div>
+        <div class="hdr-sub" id="data-hora"></div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <div class="save-status" id="save-status"><span class="status-dot" id="save-dot"></span><span id="save-txt">…</span></div>
+      <button class="hdr-btn" onclick="trocarUsuario()" title="Trocar quem está pesando"><i class="ti ti-user"></i></button>
+    </div>
+  </div>
+
+  <!-- ───── BAIXA POR ETIQUETA UPC ───── -->
+  <div class="section active" id="sec-baixa">
+    <button class="btn-scan-big" onclick="abrirScanner(function(c){ preencherBaixaComScan(c); })">
+      <i class="ti ti-scan"></i>
+      Escanear etiqueta da balança
+    </button>
+    <div class="form-card">
+      <h3>Baixa por etiqueta UPC</h3>
+      <div class="msg msg-ok" id="msg-baixa"></div>
+      <div class="field">
+        <label>Código UPC / EAN-13 da etiqueta</label>
+        <div class="field-row">
+          <input type="text" id="baixa-upc" placeholder="ex: 2007700012340" maxlength="18" inputmode="numeric" oninput="parsearUPC()">
+          <button class="scan-btn-inline" onclick="abrirScanner(function(c){ preencherBaixaComScan(c); })" title="Escanear"><i class="ti ti-barcode"></i></button>
+        </div>
+      </div>
+      <div class="field"><label>Ou peso/quant. manual</label><input type="number" id="baixa-manual" placeholder="Opcional" step="0.001" min="0" oninput="parsearUPC()"></div>
+
+      <div class="upc-box" id="upc-box">
+        <div class="upc-row"><span>Produto:</span><span id="u-nome">—</span></div>
+        <div class="upc-row"><span>Peso da etiqueta:</span><span id="u-peso">—</span></div>
+        <div class="upc-row"><span>Estoque atual (lotes):</span><span id="u-atual">—</span></div>
+        <div class="upc-row"><span>Estoque após baixa:</span><span id="u-apos" style="color:var(--yellow)">—</span></div>
+      </div>
+
+      <div class="field"><label>Responsável</label><input type="text" id="baixa-resp" placeholder="Nome do atendente"></div>
+      <button class="btn-primary" onclick="registrarBaixa()">Confirmar baixa</button>
+    </div>
+    <div class="form-card">
+      <h3>Padrão EAN-13 da balança</h3>
+      <div style="font-size:11.5px;color:var(--text2);line-height:1.8;">
+        <span style="color:var(--text);">2</span> + <span style="color:var(--blue);">CCCC</span> (código, 4 díg.) + <span style="color:var(--text3);">0</span> + <span style="color:var(--green);">VVVVVV</span> (valor em centavos) + <span style="color:var(--text3);">D</span> (verificador)<br><br>
+        <span style="color:var(--yellow);">⚠ O preço/kg precisa estar cadastrado na aba Preços para o cálculo funcionar.</span>
+      </div>
+    </div>
+  </div>
+
+
+</div>
+
+<!-- ═══════ SCANNER MODAL ═══════ -->
+<div class="scanner-modal" id="scannerModal">
+  <div class="scan-topbar">
+    <span><i class="ti ti-barcode"></i> Escanear código de barras</span>
+    <button class="scan-close" onclick="fecharScanner()"><i class="ti ti-x"></i></button>
+  </div>
+  <div class="scan-body">
+    <div id="scannerView"></div>
+    <div class="corner tl"></div><div class="corner tr"></div><div class="corner bl"></div><div class="corner br"></div>
+    <div class="laser" id="laser"></div>
+    <div class="scan-flash" id="scanFlash"></div>
+    <div class="scan-state" id="stateIdle">
+      <div class="scan-state-icon"><i class="ti ti-camera"></i></div>
+      <div class="scan-state-txt">Toque para ativar a câmera e<br>aponte para o código de barras</div>
+      <button class="scan-start-btn" onclick="iniciarScanner()">Ativar câmera</button>
+    </div>
+    <div class="scan-state" id="stateErro" style="display:none;">
+      <div class="scan-state-icon"><i class="ti ti-alert-triangle"></i></div>
+      <div class="scan-state-txt" id="erroMsg">Erro ao acessar a câmera</div>
+      <button class="scan-start-btn" onclick="iniciarScanner()">Tentar novamente</button>
+    </div>
+  </div>
+  <div class="scan-manual-toggle" onclick="scanManualPrompt()">Digitar código manualmente</div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+//  CARREGAR ZXING (fallback iOS/Safari) — arquivo local, senão CDN
+// ═══════════════════════════════════════════════════════════
+(function() {
+  var fontes = [
+    'zxing-browser.min.js',
+    'https://unpkg.com/@zxing/browser@0.1.5/umd/index.min.js',
+    'https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.5/umd/index.min.js'
+  ];
+  var idx = 0;
+  function tryNext() {
+    if (idx >= fontes.length) { console.warn('ZXing não carregou — usando BarcodeDetector nativo apenas'); return; }
+    var s = document.createElement('script');
+    s.src = fontes[idx++];
+    s.onerror = function() { tryNext(); };
+    document.head.appendChild(s);
+  }
+  tryNext();
+})();
+
+// ═══════════════════════════════════════════════════════════
+//  SCANNER — motor duplo: BarcodeDetector nativo + ZXing (iOS)
+// ═══════════════════════════════════════════════════════════
+var scannerAtivo = false;
+var _motorAtivo = null;
+var _videoStream = null, _videoEl = null, _nativeLoop = null;
+var _zxingAtivo = false, _zxingReader = null, _zxingControls = null;
+var _scanSessionId = 0;
+var _timerAviso = null;
+var audioContext = null;
+var _scanCallback = null;
+
+function isIOS() {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+function isInAppBrowser() {
+  var ua = navigator.userAgent || '';
+  return /FBAN|FBAV|Instagram|WhatsApp|Line\/|MicroMessenger|TikTok/i.test(ua);
+}
+function patchVideoForIOS(videoEl) {
+  if (!videoEl) return;
+  videoEl.setAttribute('playsinline', ''); videoEl.setAttribute('webkit-playsinline', '');
+  videoEl.setAttribute('muted', ''); videoEl.muted = true; videoEl.playsInline = true;
+}
+function initAudioContext() {
+  if (!audioContext) {
+    try { var AC = window.AudioContext || window.webkitAudioContext; if (AC) audioContext = new AC(); } catch(e) {}
+  }
+}
+function applyFocusConstraints(stream) {
+  if (!stream || !stream.getVideoTracks || !stream.getVideoTracks().length) return;
+  var track = stream.getVideoTracks()[0];
+  var caps = {}; try { caps = track.getCapabilities ? track.getCapabilities() : {}; } catch(e) {}
+  var advanced = [];
+  if (caps.focusMode && caps.focusMode.indexOf && caps.focusMode.indexOf('continuous') >= 0) advanced.push({ focusMode: 'continuous' });
+  if (caps.focusDistance !== undefined) advanced.push({ focusDistance: caps.focusDistance.min || 0 });
+  if (caps.zoom) advanced.push({ zoom: Math.min(caps.zoom.max, Math.max(caps.zoom.min, 1.5)) });
+  if (advanced.length) track.applyConstraints({ advanced: advanced }).catch(function(){});
+  if (window._focusInterval) clearInterval(window._focusInterval);
+  window._focusInterval = setInterval(function() {
+    if (!scannerAtivo) { clearInterval(window._focusInterval); return; }
+    try {
+      var t = stream.getVideoTracks()[0];
+      if (!t || t.readyState !== 'live') return;
+      var c = {}; try { c = t.getCapabilities ? t.getCapabilities() : {}; } catch(e) {}
+      var adv = [];
+      if (c.focusMode && c.focusMode.indexOf && c.focusMode.indexOf('continuous') >= 0) adv.push({ focusMode: 'continuous' });
+      if (c.focusDistance !== undefined) adv.push({ focusDistance: c.focusDistance.min || 0 });
+      if (adv.length) t.applyConstraints({ advanced: adv }).catch(function(){});
+    } catch(e) {}
+  }, 3000);
+}
+
+// ── Abre o modal do scanner. callback(codigo) é chamado ao detectar ──
+function abrirScanner(callback) {
+  _scanCallback = callback;
+  document.getElementById('scannerModal').classList.add('open');
+  document.getElementById('stateIdle').style.display = 'flex';
+  document.getElementById('stateErro').style.display = 'none';
+  iniciarScanner();
+}
+function fecharScanner() {
+  pararScanner();
+  document.getElementById('scannerModal').classList.remove('open');
+}
+function scanManualPrompt() {
+  var c = window.prompt('Digite o código de barras manualmente:');
+  if (c && c.trim()) { pararScanner(); fecharScanner(); if (_scanCallback) _scanCallback(c.trim()); }
+}
+
+async function iniciarScanner() {
+  initAudioContext();
+  document.getElementById('stateIdle').style.display = 'none';
+  document.getElementById('stateErro').style.display = 'none';
+
+  if (isInAppBrowser()) {
+    mostrarErroScanner('Câmera bloqueada pelo navegador do app (WhatsApp/Instagram/etc). Toque em "•••" ou compartilhar e escolha "Abrir no Safari/Chrome".');
+    return;
+  }
+  if (scannerAtivo) { document.getElementById('laser').style.display = 'block'; return; }
+
+  var meuSession = ++_scanSessionId;
+
+  if (typeof BarcodeDetector !== 'undefined' && !isIOS()) {
+    var constraints = { video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920, min: 1280 }, height: { ideal: 1080, min: 720 } } };
+    try {
+      var stream = await navigator.mediaDevices.getUserMedia(constraints);
+      _videoStream = stream;
+      applyFocusConstraints(stream);
+      var wrap = document.getElementById('scannerView'); wrap.innerHTML = '';
+      var vid = document.createElement('video');
+      vid.setAttribute('playsinline', ''); vid.setAttribute('autoplay', ''); vid.setAttribute('muted', '');
+      vid.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;';
+      wrap.appendChild(vid); _videoEl = vid; vid.srcObject = stream;
+      await vid.play().catch(function(){});
+
+      var formatos = ['ean_13','ean_8','code_128','code_39','upc_a','upc_e','itf'];
+      var supported = await BarcodeDetector.getSupportedFormats().catch(function(){ return formatos; });
+      var usarFmts = formatos.filter(function(f){ return supported.includes(f); });
+      if (!usarFmts.length) usarFmts = formatos;
+      var detector = new BarcodeDetector({ formats: usarFmts });
+      _motorAtivo = 'native'; scannerAtivo = true;
+      document.getElementById('laser').style.display = 'block';
+
+      var canvas = document.createElement('canvas'); var ctx = canvas.getContext('2d');
+      var loop = async function() {
+        if (!scannerAtivo || _motorAtivo !== 'native' || meuSession !== _scanSessionId) return;
+        if (vid.readyState >= 2) {
+          canvas.width = vid.videoWidth || 640; canvas.height = vid.videoHeight || 480;
+          ctx.drawImage(vid, 0, 0);
+          try {
+            var results = await detector.detect(canvas);
+            if (results && results.length > 0) {
+              if (meuSession !== _scanSessionId) return;
+              onScanSuccess(results[0].rawValue); return;
+            }
+          } catch(e) {}
+        }
+        _nativeLoop = requestAnimationFrame(loop);
+      };
+      _nativeLoop = requestAnimationFrame(loop);
+      return;
+    } catch(e) {
+      if (_videoStream) { _videoStream.getTracks().forEach(function(t){ t.stop(); }); _videoStream = null; }
+    }
+  }
+
+  if (typeof ZXingBrowser === 'undefined' || !ZXingBrowser.BrowserMultiFormatReader) {
+    var _zxWait = 0;
+    var _zxInterval = setInterval(function() {
+      _zxWait += 200;
+      if (typeof ZXingBrowser !== 'undefined' && ZXingBrowser.BrowserMultiFormatReader) { clearInterval(_zxInterval); iniciarScanner(); }
+      else if (_zxWait >= 3000) { clearInterval(_zxInterval); mostrarErroScanner('Scanner não suportado neste navegador. Use a entrada manual.'); }
+    }, 200);
+    return;
+  }
+  if (typeof ZXingBrowser !== 'undefined' && ZXingBrowser.BrowserMultiFormatReader) {
+    var wrap2 = document.getElementById('scannerView');
+    wrap2.innerHTML = '<video id="zxing-video" playsinline muted autoplay style="width:100%;height:100%;object-fit:cover;display:block;position:absolute;inset:0;"></video>';
+    var videoEl = document.getElementById('zxing-video'); patchVideoForIOS(videoEl);
+
+    _zxingReader = new ZXingBrowser.BrowserMultiFormatReader();
+    _zxingReader.timeBetweenScansMillis = 150;
+    try {
+      if (ZXingBrowser.BarcodeFormat) {
+        var bf = ZXingBrowser.BarcodeFormat;
+        var fmtsDesejados = [bf.EAN_13, bf.EAN_8, bf.UPC_A, bf.UPC_E, bf.CODE_128, bf.CODE_39, bf.ITF].filter(function(f){ return f !== undefined; });
+        if (fmtsDesejados.length) _zxingReader.possibleFormats = fmtsDesejados;
+      }
+    } catch(e) {}
+
+    try {
+      var zxConstraints = { video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920, min: 1280 }, height: { ideal: 1080, min: 720 } }, audio: false };
+      var zxStream = await navigator.mediaDevices.getUserMedia(zxConstraints);
+      _videoStream = zxStream; videoEl.srcObject = zxStream;
+      await videoEl.play().catch(function(){});
+      applyFocusConstraints(zxStream);
+
+      _zxingControls = await _zxingReader.decodeFromStream(zxStream, videoEl, function(result, error) {
+        if (result) {
+          if (meuSession !== _scanSessionId) return;
+          limparTimerAviso();
+          if (!scannerAtivo) return;
+          setTimeout(function() {
+            if (meuSession !== _scanSessionId) return;
+            onScanSuccess(result.getText());
+          }, 120);
+        }
+      });
+      _zxingAtivo = true; _motorAtivo = 'zxing'; scannerAtivo = true;
+      document.getElementById('laser').style.display = 'block';
+      iniciarTimerAviso();
+    } catch(err) {
+      var msg = 'Câmera não disponível';
+      if (/[Pp]ermission|[Nn]ot[Aa]llowed|[Dd]enied/.test(String(err))) msg = 'Permissão de câmera negada — vá em Ajustes > Safari/Chrome > Câmera e permita o acesso';
+      else if (/[Nn]ot[Ff]ound|[Dd]evices/.test(String(err))) msg = 'Câmera não encontrada neste dispositivo';
+      else if (/[Nn]ot[Rr]eadable|[Tt]rackStart/.test(String(err))) msg = 'Câmera em uso por outro app — feche outros apps que usam a câmera';
+      mostrarErroScanner(msg);
+      if (_videoStream) { _videoStream.getTracks().forEach(function(t){ t.stop(); }); _videoStream = null; }
+      return;
+    }
+    return;
+  }
+  mostrarErroScanner('Scanner não suportado neste navegador. Use a entrada manual.');
+}
+
+function pararScanner() {
+  scannerAtivo = false; _scanSessionId++;
+  var laser = document.getElementById('laser'); if (laser) laser.style.display = 'none';
+  limparTimerAviso();
+  if (window._focusInterval) { clearInterval(window._focusInterval); window._focusInterval = null; }
+  if (_nativeLoop) { cancelAnimationFrame(_nativeLoop); _nativeLoop = null; }
+  if (_zxingAtivo && _zxingReader) {
+    try {
+      if (_zxingControls && typeof _zxingControls.stop === 'function') _zxingControls.stop();
+      var zxVideo = document.getElementById('zxing-video');
+      if (zxVideo && zxVideo.srcObject) { zxVideo.srcObject.getTracks().forEach(function(t){ t.stop(); }); zxVideo.srcObject = null; }
+    } catch(e) {}
+    _zxingAtivo = false; _zxingReader = null; _zxingControls = null;
+  }
+  if (_videoStream) { _videoStream.getTracks().forEach(function(t){ t.stop(); }); _videoStream = null; }
+  if (_videoEl) { _videoEl.srcObject = null; _videoEl = null; }
+}
+
+function mostrarErroScanner(msg) {
+  document.getElementById('erroMsg').textContent = msg;
+  document.getElementById('stateErro').style.display = 'flex';
+  document.getElementById('laser').style.display = 'none';
+  scannerAtivo = false;
+}
+
+function normalizarCodigo(code) {
+  if (!code) return code;
+  code = code.trim();
+  if (code.length === 13 && code.charAt(0) === '0') return code.substring(1);
+  return code;
+}
+function tocarBip() {
+  try {
+    if (!audioContext) { var AC = window.AudioContext || window.webkitAudioContext; if (!AC) return; audioContext = new AC(); }
+    if (audioContext.state === 'suspended') audioContext.resume().then(tocarBipAgora); else tocarBipAgora();
+  } catch(e) {}
+}
+function tocarBipAgora() {
+  try {
+    var osc = audioContext.createOscillator(); var gain = audioContext.createGain();
+    osc.connect(gain); gain.connect(audioContext.destination);
+    osc.type = 'sine'; osc.frequency.value = 1800;
+    var now = audioContext.currentTime;
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(0.3, now + 0.01);
+    gain.gain.linearRampToValueAtTime(0, now + 0.1);
+    osc.start(now); osc.stop(now + 0.1);
+  } catch(e) {}
+}
+function vibrarAviso() { if (navigator.vibrate) navigator.vibrate([100, 50, 100]); }
+function iniciarTimerAviso() {
+  limparTimerAviso();
+  _timerAviso = setTimeout(function() { if (scannerAtivo) { vibrarAviso(); iniciarTimerAviso(); } }, 3000);
+}
+function limparTimerAviso() { if (_timerAviso) { clearTimeout(_timerAviso); _timerAviso = null; } }
+
+function onScanSuccess(code) {
+  if (!code) return;
+  code = normalizarCodigo(code);
+  pararScanner();
+  var flash = document.getElementById('scanFlash');
+  flash.classList.add('show'); setTimeout(function(){ flash.classList.remove('show'); }, 220);
+  if (navigator.vibrate) navigator.vibrate([50, 30, 50]);
+  tocarBip();
+  fecharScanner();
+  if (_scanCallback) _scanCallback(code);
+}
+
+// Preenche o campo de baixa com o código escaneado e já dispara o parser
+function preencherBaixaComScan(codigo) {
+  var el = document.getElementById('baixa-upc');
+  el.value = codigo;
+  parsearUPC();
+}
+
+// ═══════════════════════════════════════════════════════════
+//  DADOS BASE
+// ═══════════════════════════════════════════════════════════
+const PRODUTOS_BASE=[
+  {codigo:'79', nome:'PRESUNTO FATIADO',        precoKg:34.99, saldo:10.300, validade:'2026-07-13', min:1.0, unidade:'kg'},
+  {codigo:'206',nome:'MORTADELA BOLONHA KG',    precoKg:33.99, saldo:0.000,  validade:'',           min:1.0, unidade:'kg'},
+  {codigo:'140',nome:'MORTADELA BOLONHA OURO',  precoKg:36.99, saldo:19.500, validade:'2026-06-10', min:1.0, unidade:'kg'},
+  {codigo:'4346',nome:'QUEIJO MUSSARELA FATIADO',precoKg:59.99, saldo:112.900,validade:'2026-08-08', min:1.0, unidade:'kg'},
+  {codigo:'141',nome:'SALSICHA KG',             precoKg:14.99, saldo:33.600, validade:'2026-08-12', min:1.0, unidade:'kg'},
+  {codigo:'205',nome:'MORTADELA COMUM FATIADA', precoKg:14.99, saldo:0.000,  validade:'',           min:1.0, unidade:'kg'},
+];
+
+let estoque=[], historico=[], salvando=false;
+
+function setSaveStatus(txt,cor){
+  document.getElementById('save-txt').textContent=txt;
+  document.getElementById('save-dot').style.background=cor;
+}
+
+let pollingInterval = null;
+
+function carregar(){
+  setSaveStatus('Conectando...','#888');
+  fetch(SHEETS_API_URL)
+    .then(r => r.json())
+    .then(dados => {
+      estoque = (dados.estoque && dados.estoque.length) ? dados.estoque : PRODUTOS_BASE.map(p => ({...p}));
+      estoque = estoque.map(p => {
+        if (p.precoKg === undefined || p.precoKg === '') {
+          const base = PRODUTOS_BASE.find(b => b.codigo === p.codigo);
+          p.precoKg = base ? base.precoKg : 0;
+        }
+        return p;
+      });
+      historico = dados.historico || [];
+      if (!dados.estoque || !dados.estoque.length) salvar();
+
+      setSaveStatus('Online ✓', '#4caf50');
+      document.getElementById('offlineBar').classList.remove('show');
+
+      if (!pollingInterval) pollingInterval = setInterval(sincronizar, 20000);
+    })
+    .catch(e => {
+      console.error('Erro ao carregar da planilha:', e);
+      setSaveStatus('Erro de conexão', '#e05252');
+      document.getElementById('offlineBar').classList.add('show');
+    });
+}
+
+function sincronizar(){
+  if (salvando) return;
+  fetch(SHEETS_API_URL)
+    .then(r => r.json())
+    .then(dados => {
+      estoque = dados.estoque || []; historico = dados.historico || [];
+      setSaveStatus('Online ✓', '#4caf50');
+      document.getElementById('offlineBar').classList.remove('show');
+    })
+    .catch(e => { console.error('Erro na sincronização periódica:', e); document.getElementById('offlineBar').classList.add('show'); });
+}
+
+async function salvar(){
+  if(salvando)return; salvando=true;
+  setSaveStatus('Salvando...','#888');
+  try{
+    await fetch(SHEETS_API_URL, { method: 'POST', headers: {'Content-Type': 'text/plain;charset=utf-8'}, body: JSON.stringify({estoque, historico}) });
+    setSaveStatus('Salvo ✓','#4caf50');
+  }catch(e){
+    console.error('Erro ao salvar na planilha:',e);
+    setSaveStatus('Erro ao salvar','#e05252');
+  }
+  salvando=false;
+}
+
+function trocarUsuario(){
+  storageSet(LOGIN_STORAGE_KEY, '');
+  document.getElementById('baixa-resp').value = '';
+  document.getElementById('app-conteudo').style.display = 'none';
+  document.getElementById('login-overlay').style.display = 'flex';
+}
+
+function statusVal(v){
+  if(!v)return'';
+  const hoje=new Date();hoje.setHours(0,0,0,0);
+  const d=new Date(v+'T00:00:00');
+  const diff=Math.ceil((d-hoje)/86400000);
+  if(diff<0)return'vencido';
+  if(diff<=3)return'vencendo';
+  return'ok';
+}
+function fmtData(iso){ if(!iso)return'—'; const[y,m,d]=iso.split('-'); return d+'/'+m+'/'+y; }
+function fmtHora(ts){ const d=new Date(ts); return d.toLocaleDateString('pt-BR')+' '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}); }
+
+function mostrarMsg(id,tipo,txt){
+  const el=document.getElementById(id);
+  el.className='msg '+tipo+' show';el.textContent=txt;
+  setTimeout(()=>el.classList.remove('show'),4000);
+}
+
+function parsearUPC(){
+  const upc=document.getElementById('baixa-upc').value.replace(/\D/g,'');
+  const manual=parseFloat(document.getElementById('baixa-manual').value)||0;
+  const box=document.getElementById('upc-box');
+  if(upc.length<5&&!manual){box.classList.remove('show');return;}
+  let codInt='', pesoKg=0, valorReais=0;
+  if(upc.length===13 && upc.startsWith('2')){
+    codInt=parseInt(upc.substring(1,5)).toString();
+    valorReais=parseInt(upc.substring(6,12))/100;
+  } else {
+    codInt=upc;
+  }
+  const prod=estoque.find(p=>p.codigo===codInt||p.codigo===upc);
+  if(prod && valorReais>0 && prod.precoKg>0){
+    pesoKg=Math.round((valorReais/prod.precoKg)*1000)/1000;
+  }
+  const usar=pesoKg>0?pesoKg:manual;
+  const und=prod?(prod.unidade||'kg'):'kg';
+  document.getElementById('u-nome').textContent=prod?prod.nome:'Não encontrado (cód: '+codInt+')';
+  if(prod && valorReais>0 && prod.precoKg>0){
+    document.getElementById('u-peso').textContent=usar.toFixed(3)+' '+und+' (R$ '+valorReais.toFixed(2)+' ÷ R$ '+prod.precoKg.toFixed(2)+'/kg)';
+  } else if(prod && valorReais>0 && (!prod.precoKg||prod.precoKg===0)){
+    document.getElementById('u-peso').textContent='Preço/kg não cadastrado — informe manualmente';
+  } else {
+    document.getElementById('u-peso').textContent=usar>0?usar.toFixed(3)+' '+und:'— (informe manualmente)';
+  }
+  const saldoTotal = prod ? estoque.filter(p=>p.codigo===prod.codigo).reduce((sum,p)=>sum+p.saldo,0) : 0;
+  document.getElementById('u-atual').textContent=prod?saldoTotal.toFixed(3)+' '+und:'—';
+  document.getElementById('u-apos').textContent=prod&&usar>0?Math.max(0,saldoTotal-usar).toFixed(3)+' '+und:'—';
+  box.classList.add('show');
+}
+
+function registrarBaixa(){
+  const upc=document.getElementById('baixa-upc').value.replace(/\D/g,'');
+  const manual=parseFloat(document.getElementById('baixa-manual').value)||0;
+  const resp=document.getElementById('baixa-resp').value.trim();
+  let codInt='', pesoKg=0, valorReais=0;
+  if(upc.length===13 && upc.startsWith('2')){
+    codInt=parseInt(upc.substring(1,5)).toString();
+    valorReais=parseInt(upc.substring(6,12))/100;
+  } else {
+    codInt=upc;
+  }
+  if(!upc)return mostrarMsg('msg-baixa','msg-err','Informe o código UPC.');
+  let lotes = estoque.filter(p => p.codigo === codInt || p.codigo === upc);
+  if(lotes.length === 0)return mostrarMsg('msg-baixa','msg-err','Produto não encontrado. Código: '+codInt);
+  if(valorReais>0 && lotes[0].precoKg>0){ pesoKg=Math.round((valorReais/lotes[0].precoKg)*1000)/1000; } else { pesoKg=manual; }
+  if(!pesoKg||pesoKg<=0)return mostrarMsg('msg-baixa','msg-err','Peso não encontrado. Cadastre o preço/kg ou use o campo manual.');
+
+  const und=lotes[0].unidade||'kg';
+  const codProd=lotes[0].codigo;
+  const nomeProd=lotes[0].nome;
+
+  let lotesComValidade = lotes.filter(l => l.validade);
+  let lotesSemValidade = lotes.filter(l => !l.validade);
+  lotesComValidade.sort((a, b) => new Date(a.validade + 'T00:00:00') - new Date(b.validade + 'T00:00:00'));
+  let lotesOrdenados = [...lotesComValidade, ...lotesSemValidade];
+
+  let pesoFaltante = pesoKg;
+  for (let lote of lotesOrdenados) {
+    if (pesoFaltante <= 0) break;
+    if (lote.saldo <= 0) continue;
+    let aBaixar = Math.min(lote.saldo, pesoFaltante);
+    lote.saldo = Math.round((lote.saldo - aBaixar) * 1000) / 1000;
+    pesoFaltante = Math.round((pesoFaltante - aBaixar) * 1000) / 1000;
+  }
+  if (pesoFaltante > 0) lotesOrdenados[0].saldo = Math.round((lotesOrdenados[0].saldo - pesoFaltante) * 1000) / 1000;
+
+  const totalConsolidado = estoque.filter(p => p.codigo === codProd).reduce((sum, p) => sum + p.saldo, 0);
+  historico.push({ts:Date.now(),tipo:'baixa',codigo:codProd,nome:nomeProd,peso:pesoKg,saldoApos:totalConsolidado,resp});
+
+  salvar();
+  mostrarMsg('msg-baixa','msg-ok','✓ Baixa de '+pesoKg.toFixed(3)+' '+und+'. Saldo total: '+totalConsolidado.toFixed(3)+' '+und);
+  document.getElementById('baixa-upc').value='';
+  document.getElementById('baixa-manual').value='';
+  document.getElementById('upc-box').classList.remove('show');
+}
+
+function atualizarRelogio(){
+  document.getElementById('data-hora').textContent=new Date().toLocaleDateString('pt-BR',{weekday:'short',day:'2-digit',month:'2-digit'})+' — '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+}
+
+// Detecta ficar offline/online
+window.addEventListener('offline', function(){ document.getElementById('offlineBar').classList.add('show'); });
+window.addEventListener('online', function(){ document.getElementById('offlineBar').classList.remove('show'); sincronizar(); });
+
+atualizarRelogio();
+setInterval(atualizarRelogio,60000);
+
+// Registra Service Worker simples (permite abrir o app mesmo com sinal fraco)
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function() {
+    const swCode = "self.addEventListener('fetch', function(e){});";
+    const blob = new Blob([swCode], {type: 'application/javascript'});
+    navigator.serviceWorker.register(URL.createObjectURL(blob)).catch(function(){});
+  });
+}
+</script>
+</body></html>
