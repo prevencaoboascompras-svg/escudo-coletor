@@ -1,0 +1,952 @@
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 230'%3E%3Cpath d='M100 8 L172 32 L172 108 Q172 178 100 218 Q28 178 28 108 L28 32 Z' fill='%232b2b2b' stroke='%23e8241a' stroke-width='10' stroke-linejoin='round'/%3E%3Cg transform='translate(72,78)'%3E%3Cpath d='M0 8 L38 0 L52 9 L52 56 Q52 60 48 60 L4 60 Q0 60 0 56 Z' fill='%23f2f6d8' stroke='%233a3a2a' stroke-width='2'/%3E%3Ccircle cx='12' cy='19' r='3.6' fill='%232b2b2b'/%3E%3Ccircle cx='33' cy='16' r='3' fill='%232b2b2b'/%3E%3Ccircle cx='22' cy='35' r='3.2' fill='%232b2b2b'/%3E%3Ccircle cx='41' cy='37' r='4' fill='%232b2b2b'/%3E%3Ccircle cx='8' cy='45' r='2.6' fill='%232b2b2b'/%3E%3C/g%3E%3C/svg%3E">
+
+<script>
+  // ===== CONFIGURAÇÃO: Google Apps Script (planilha como banco de dados) =====
+  // Cole aqui a URL do seu Web App publicado (Implantar > Nova implantação > App da Web)
+  const SHEETS_API_URL = "https://script.google.com/macros/s/AKfycbyZx1TQ46O8BmdZH7ZxO4fh8Prrc8rDXsq47gcPPDG1EWnnoVlvkfYhM4-8CIIAGceW/exec";
+
+  // Chama carregar() assim que a página estiver pronta
+  function tentarCarregar(){
+    if(typeof carregar === 'function') carregar();
+    else setTimeout(tentarCarregar, 50);
+  }
+  if(document.readyState === 'loading'){
+    window.addEventListener('DOMContentLoaded', tentarCarregar);
+  } else {
+    tentarCarregar();
+  }
+</script>
+
+<script>
+  // ===== LOGIN (hash SHA-256 — a senha em texto puro nunca fica salva no código) =====
+  const USUARIOS_HASH = {
+    'Leonardo': '06c117bb812639e8f80c10b64953df8b099fd534b2fcae74f49f735b93fedba4',
+    'Taiti':    '36d11eae17888531788f2b5e6ad6130f7f60da4f6076ced7f973cdf51f16eb5f',
+    'Wagner':   '7d3ca4a4cc367aa11f38e2ad017ed96c1e2a8d00b59a982ab2b4e32d3b98b946'
+  };
+  const LOGIN_STORAGE_KEY = 'frios_login_usuario';
+  let usuarioSelecionado = null;
+
+  // Acesso seguro ao storage (alguns navegadores/Edge bloqueiam sessionStorage em certos contextos)
+  function storageGet(key){ try{ return sessionStorage.getItem(key); }catch(e){ return window['_mem_'+key] || null; } }
+  function storageSet(key,val){ try{ sessionStorage.setItem(key,val); }catch(e){ window['_mem_'+key] = val; } }
+
+  async function sha256(texto){
+    const buffer = new TextEncoder().encode(texto);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
+    return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2,'0')).join('');
+  }
+
+  function liberarAcesso(nome){
+    document.getElementById('login-overlay').style.display = 'none';
+    document.getElementById('app-conteudo').style.display = 'block';
+  }
+
+  function selecionarUsuario(nome){
+    usuarioSelecionado = nome;
+    document.getElementById('login-avatars').style.display = 'none';
+    document.getElementById('login-step1-sub').style.display = 'none';
+    document.getElementById('login-senha-usuario').textContent = nome;
+    document.getElementById('login-senha-erro').textContent = '';
+    const input = document.getElementById('login-senha-input');
+    input.value = '';
+    document.getElementById('login-senha-box').classList.add('show');
+    setTimeout(() => input.focus(), 50);
+  }
+
+  function voltarLogin(){
+    usuarioSelecionado = null;
+    document.getElementById('login-senha-box').classList.remove('show');
+    document.getElementById('login-avatars').style.display = 'flex';
+    document.getElementById('login-step1-sub').style.display = 'block';
+  }
+
+  async function validarSenha(){
+    if(!usuarioSelecionado) return;
+    const senha = document.getElementById('login-senha-input').value;
+    const erroEl = document.getElementById('login-senha-erro');
+    if(!senha){ erroEl.textContent = 'Digite a senha.'; return; }
+
+    const hashDigitado = await sha256(senha);
+    if(hashDigitado === USUARIOS_HASH[usuarioSelecionado]){
+      storageSet(LOGIN_STORAGE_KEY, usuarioSelecionado);
+      liberarAcesso(usuarioSelecionado);
+    } else {
+      erroEl.textContent = 'Senha incorreta.';
+      document.getElementById('login-senha-input').value = '';
+    }
+  }
+
+  // Já logado nesta sessão do navegador? Pula direto pro sistema
+  (function verificarLoginExistente(){
+    const usuarioSalvo = storageGet(LOGIN_STORAGE_KEY);
+    if(usuarioSalvo && USUARIOS_HASH[usuarioSalvo]){
+      liberarAcesso(usuarioSalvo);
+    }
+  })();
+</script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+--bg:#1a1a1a;--bg2:#222;--bg3:#2a2a2a;--bg4:#333;
+--text:#e8e8e8;--text2:#aaa;--text3:#666;
+--border:#3a3a3a;
+--green:#4caf50;--green-bg:#1a2e1a;--green-text:#4caf50;
+--red:#e05252;--red-bg:#2e1a1a;--red-text:#e05252;
+--yellow:#e0a020;--yellow-bg:#2e2510;--yellow-text:#e0a020;
+--blue:#5b9bd5;
+--radius:6px;
+}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;font-size:14px;}
+.app{padding:16px;}
+.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:18px;overflow:hidden;}
+.card-m{background:var(--bg2);padding:20px 24px;}
+.card-m .label{font-size:12px;color:var(--text2);margin-bottom:6px;}
+.card-m .val{font-size:32px;font-weight:600;}
+.val-white{color:var(--text);}
+.val-green{color:var(--green);}
+.val-yellow{color:var(--yellow);}
+.val-red{color:var(--red);}
+.tabs{display:flex;gap:8px;margin-bottom:18px;}
+.tab{background:var(--bg2);border:1px solid var(--border);color:var(--text2);padding:7px 16px;border-radius:var(--radius);cursor:pointer;font-size:13px;display:flex;align-items:center;gap:6px;}
+.tab:hover{background:var(--bg3);color:var(--text);}
+.tab.active{background:var(--bg3);color:var(--text);border-color:#555;}
+.section{display:none;}
+.section.active{display:block;}
+.tbl-wrap{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;}
+th{text-align:left;padding:10px 12px;color:var(--text2);font-weight:500;font-size:13px;border-bottom:1px solid var(--border);}
+td{padding:9px 12px;border-bottom:1px solid var(--border);color:var(--text);font-size:13px;}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:var(--bg3);}
+.badge{display:inline-block;padding:3px 10px;border-radius:4px;font-size:12px;font-weight:600;}
+.b-ok{background:var(--green-bg);color:var(--green-text);}
+.b-zero{background:var(--red-bg);color:var(--red-text);}
+.b-low{background:var(--yellow-bg);color:var(--yellow-text);}
+.b-venc{background:var(--red-bg);color:var(--red-text);}
+.b-entry{background:#1a2535;color:#5b9bd5;}
+.b-baixa{background:var(--yellow-bg);color:var(--yellow-text);}
+.btn-sm{background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:4px 11px;border-radius:4px;cursor:pointer;font-size:12px;margin-right:3px;}
+.btn-sm:hover{background:var(--bg4);}
+.btn-primary{background:#2d4a2d;border:1px solid #3d6b3d;color:#6fcf6f;padding:8px 20px;border-radius:var(--radius);cursor:pointer;font-size:13px;font-weight:600;}
+.btn-primary:hover{background:#3a5e3a;}
+.btn-danger{background:var(--red-bg);border:1px solid #5a2a2a;color:var(--red-text);padding:6px 14px;border-radius:var(--radius);cursor:pointer;font-size:12px;}
+.form-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:18px;margin-bottom:14px;}
+.form-card h3{font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:14px;}
+.frow{display:grid;gap:12px;margin-bottom:12px;}
+.frow2{grid-template-columns:1fr 1fr;}
+.frow3{grid-template-columns:1fr 1fr 1fr;}
+.field label{display:block;font-size:11px;color:var(--text2);margin-bottom:5px;}
+.field input,.field select{width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:4px;font-size:13px;}
+.field input:focus,.field select:focus{outline:none;border-color:#555;}
+.field select option{background:var(--bg2);}
+.msg{padding:9px 14px;border-radius:var(--radius);font-size:13px;margin-bottom:12px;display:none;}
+.msg.show{display:block;}
+.msg-ok{background:var(--green-bg);color:var(--green-text);border:1px solid #2a4a2a;}
+.msg-err{background:var(--red-bg);color:var(--red-text);border:1px solid #4a2a2a;}
+.upc-box{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:12px;margin:10px 0;display:none;}
+.upc-box.show{display:block;}
+.upc-row{display:flex;justify-content:space-between;padding:3px 0;font-size:13px;}
+.upc-row span:first-child{color:var(--text2);}
+.upc-row span:last-child{font-weight:600;}
+.loading{color:var(--text2);font-size:13px;padding:20px 0;}
+.status-dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px;}
+.dot-ok{background:var(--green);}
+.dot-save{background:#888;}
+.header-row{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;padding-top:4px;}
+.header-title{font-size:17px;font-weight:600;}
+.header-sub{font-size:12px;color:var(--text2);margin-top:2px;}
+.save-status{font-size:11px;color:var(--text3);display:flex;align-items:center;gap:5px;}
+
+/* ===== LOGIN ===== */
+.login-overlay{position:fixed;inset:0;background:radial-gradient(circle at 50% 30%,#241414 0%,#181010 60%,var(--bg) 100%);display:flex;align-items:center;justify-content:center;z-index:1000;}
+.login-card{background:#1c1c1c;border:1px solid var(--border);border-radius:14px;padding:40px 48px;width:380px;max-width:90vw;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.5);}
+.login-icon{margin-bottom:14px;display:flex;justify-content:center;}
+.app-logo{width:34px;height:34px;flex-shrink:0;}
+.login-eyebrow{font-size:11px;letter-spacing:.12em;color:var(--text2);font-weight:600;margin-bottom:6px;}
+.login-title{font-size:21px;font-weight:700;color:var(--text);margin-bottom:6px;}
+.login-sub{font-size:13px;color:var(--text2);margin-bottom:24px;}
+.login-avatars{display:flex;justify-content:center;gap:22px;margin-bottom:8px;}
+.login-avatar{cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:8px;}
+.login-avatar-circle{width:56px;height:56px;border-radius:50%;background:linear-gradient(160deg,#e05252,#a82020);color:#fff;font-size:22px;font-weight:700;display:flex;align-items:center;justify-content:center;transition:transform .15s;}
+.login-avatar:hover .login-avatar-circle{transform:scale(1.08);}
+.login-avatar-nome{font-size:12px;color:var(--text2);}
+.login-senha-box{display:none;margin-top:6px;}
+.login-senha-box.show{display:block;}
+.login-senha-usuario{font-size:14px;font-weight:600;color:var(--text);margin-bottom:14px;}
+.login-senha-input{width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:10px 12px;border-radius:6px;font-size:14px;text-align:center;letter-spacing:.1em;}
+.login-senha-input:focus{outline:none;border-color:#a82020;}
+.login-senha-erro{color:var(--red-text);font-size:12px;min-height:16px;margin-top:8px;}
+.login-senha-botoes{display:flex;gap:10px;margin-top:6px;}
+.login-btn-voltar{flex:1;background:var(--bg3);border:1px solid var(--border);color:var(--text2);padding:9px;border-radius:6px;cursor:pointer;font-size:13px;}
+.login-btn-voltar:hover{background:var(--bg4);}
+.login-btn-entrar{flex:2;background:linear-gradient(160deg,#e05252,#a82020);border:none;color:#fff;padding:9px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;}
+.login-btn-entrar:hover{filter:brightness(1.1);}
+.login-footer{font-size:11px;color:var(--text3);margin-top:26px;}
+.app-conteudo-protegido{display:none;}
+</style>
+
+</head><body>
+
+<!-- ===== TELA DE LOGIN ===== -->
+<div id="login-overlay" class="login-overlay">
+  <div class="login-card">
+    <div class="login-icon">
+      <svg class="app-logo" width="56" height="64" viewBox="0 0 200 230" xmlns="http://www.w3.org/2000/svg">
+        <path d="M100 8 L172 32 L172 108 Q172 178 100 218 Q28 178 28 108 L28 32 Z" fill="#2b2b2b" stroke="#e8241a" stroke-width="10" stroke-linejoin="round"/>
+        <g transform="translate(72,78)">
+          <path d="M0 8 L38 0 L52 9 L52 56 Q52 60 48 60 L4 60 Q0 60 0 56 Z" fill="#f2f6d8" stroke="#3a3a2a" stroke-width="2"/>
+          <circle cx="12" cy="19" r="3.6" fill="#2b2b2b"/>
+          <circle cx="33" cy="16" r="3" fill="#2b2b2b"/>
+          <circle cx="22" cy="35" r="3.2" fill="#2b2b2b"/>
+          <circle cx="41" cy="37" r="4" fill="#2b2b2b"/>
+          <circle cx="8" cy="45" r="2.6" fill="#2b2b2b"/>
+        </g>
+      </svg>
+    </div>
+    <div class="login-eyebrow">ESCUDO PADARIA</div>
+    <div class="login-title">Sistema de Controle de Estoque de Frios</div>
+    <div class="login-sub" id="login-step1-sub">Quem está acessando?</div>
+
+    <div id="login-avatars" class="login-avatars">
+      <div class="login-avatar" data-user="Leonardo" onclick="selecionarUsuario('Leonardo')">
+        <div class="login-avatar-circle">L</div>
+        <div class="login-avatar-nome">Leonardo</div>
+      </div>
+      <div class="login-avatar" data-user="Taiti" onclick="selecionarUsuario('Taiti')">
+        <div class="login-avatar-circle">T</div>
+        <div class="login-avatar-nome">Taiti</div>
+      </div>
+      <div class="login-avatar" data-user="Wagner" onclick="selecionarUsuario('Wagner')">
+        <div class="login-avatar-circle">W</div>
+        <div class="login-avatar-nome">Wagner</div>
+      </div>
+    </div>
+
+    <div id="login-senha-box" class="login-senha-box">
+      <div class="login-senha-usuario" id="login-senha-usuario"></div>
+      <input type="password" id="login-senha-input" class="login-senha-input" placeholder="Senha" autocomplete="off" onkeydown="if(event.key==='Enter')validarSenha()">
+      <div id="login-senha-erro" class="login-senha-erro"></div>
+      <div class="login-senha-botoes">
+        <button class="login-btn-voltar" onclick="voltarLogin()">‹ Voltar</button>
+        <button class="login-btn-entrar" onclick="validarSenha()">Entrar</button>
+      </div>
+    </div>
+
+    <div class="login-footer">Acesso exclusivo para gestores autorizados</div>
+  </div>
+</div>
+
+<div id="app-conteudo" class="app-conteudo-protegido"><div class="app">
+
+<div class="header-row">
+  <div style="display:flex;align-items:center;gap:10px;">
+    <svg class="app-logo" width="30" height="34" viewBox="0 0 200 230" xmlns="http://www.w3.org/2000/svg">
+      <path d="M100 8 L172 32 L172 108 Q172 178 100 218 Q28 178 28 108 L28 32 Z" fill="#2b2b2b" stroke="#e8241a" stroke-width="10" stroke-linejoin="round"/>
+      <g transform="translate(72,78)">
+        <path d="M0 8 L38 0 L52 9 L52 56 Q52 60 48 60 L4 60 Q0 60 0 56 Z" fill="#f2f6d8" stroke="#3a3a2a" stroke-width="2"/>
+        <circle cx="12" cy="19" r="3.6" fill="#2b2b2b"/>
+        <circle cx="33" cy="16" r="3" fill="#2b2b2b"/>
+        <circle cx="22" cy="35" r="3.2" fill="#2b2b2b"/>
+        <circle cx="41" cy="37" r="4" fill="#2b2b2b"/>
+        <circle cx="8" cy="45" r="2.6" fill="#2b2b2b"/>
+      </g>
+    </svg>
+    <div>
+    <div style="font-size:20px;font-weight:700;color:var(--text);line-height:1.2;">Sistema de controle de estoque de frios</div>
+    <div style="font-size:15px;font-weight:600;color:var(--text);margin-top:2px;">Estoque de Frios</div>
+    <div style="font-size:12px;color:var(--text2);margin-top:1px;" id="data-hora"></div>
+  </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px;">
+    <div class="save-status" id="save-status"><span class="status-dot" id="save-dot" style="background:#888;"></span><span id="save-txt">Conectando...</span></div>
+    <button class="btn-primary" onclick="exportarRelatorio()">↗ Exportar relatório</button>
+  </div>
+</div>
+
+<div class="cards" id="summary-cards" style="grid-template-columns:repeat(4,1fr);margin-bottom:20px;">
+  <div class="card-m"><div class="label">Produtos cadastrados</div><div class="val val-white" id="s-total">—</div></div>
+  <div class="card-m"><div class="label">Estoque OK</div><div class="val val-green" id="s-ok">—</div></div>
+  <div class="card-m"><div class="label">Estoque baixo / zerado</div><div class="val val-yellow" id="s-low">—</div></div>
+  <div class="card-m"><div class="label">Validades críticas</div><div class="val val-white" id="s-venc">—</div></div>
+</div>
+
+<div class="tabs">
+  <button class="tab active" id="tab-estoque" onclick="switchTab('estoque')">⊞ Estoque & Cadastro</button>
+  <button class="tab" id="tab-entrada" onclick="switchTab('entrada')">+ Entrada</button>
+  <button class="tab" id="tab-baixa" onclick="switchTab('baixa')">⊟ Baixa UPC</button>
+  <button class="tab" id="tab-precos" onclick="switchTab('precos')">$ Preços/kg</button>
+  <button class="tab" id="tab-historico" onclick="switchTab('historico')">↺ Histórico</button>
+</div>
+
+<div class="section active" id="sec-estoque">
+  <div class="form-card" style="margin-bottom:16px;">
+    <h3>Cadastrar Novo Produto</h3>
+    <div class="frow frow3">
+      <div class="field"><label>Código interno / EAN</label><input type="text" id="add-codigo" placeholder="ex: 80"></div>
+      <div class="field"><label>Nome do Produto</label><input type="text" id="add-nome" placeholder="ex: QUEIJO PRATO KG"></div>
+      <div class="field"><label>Unidade de Medida</label>
+        <select id="add-unidade">
+          <option value="kg">kg (Quilograma)</option>
+          <option value="un">un (Unidade)</option>
+          <option value="pct">pct (Pacote)</option>
+        </select>
+      </div>
+    </div>
+    <div class="frow frow2">
+      <div class="field"><label>Estoque Mínimo Alerta</label><input type="number" id="add-min" value="1.0" step="0.001" min="0"></div>
+      <div class="field"><label>Estoque Inicial Atual</label><input type="number" id="add-saldo" value="0.0" step="0.001" min="0"></div>
+    </div>
+    <button class="btn-primary" onclick="adicionarProduto()">+ Adicionar Produto ao Banco</button>
+  </div>
+
+  <div class="tbl-wrap">
+  <table>
+    <thead><tr>
+      <th style="width:25%">Produto</th>
+      <th style="width:8%">Código</th>
+      <th style="width:15%">Estoque Atual</th>
+      <th style="width:14%">Validade</th>
+      <th style="width:10%">Status</th>
+      <th style="width:28%">Ações de Controle</th>
+    </tr></thead>
+    <tbody id="tbody-estoque">
+      </tbody>
+  </table>
+  </div>
+</div>
+
+<div class="section" id="sec-entrada">
+  <div class="form-card">
+    <h3>Registrar entrada de produto</h3>
+    <div class="msg msg-ok" id="msg-entrada"></div>
+    <div class="frow frow2">
+      <div class="field"><label>Produto</label>
+        <select id="ent-produto" onchange="preencherEntrada()"><option value="">Selecione...</option></select>
+      </div>
+      <div class="field"><label>Código</label>
+        <input type="text" id="ent-codigo" readonly="" placeholder="Automático">
+      </div>
+    </div>
+    <div class="frow frow3">
+      <div class="field"><label>Quantidade / Peso recebido</label>
+        <input type="number" id="ent-peso" placeholder="ex: 2.350" step="0.001" min="0">
+      </div>
+      <div class="field"><label>Validade</label>
+        <input type="date" id="ent-validade">
+      </div>
+      <div class="field"><label>Responsável</label>
+        <input type="text" id="ent-resp" placeholder="Nome">
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;margin-top:4px;">
+      <button class="btn-primary" onclick="registrarEntrada()">Confirmar entrada</button>
+      <span style="font-size:12px;color:var(--text3);">Se a validade for nova, um novo lote independente será criado.</span>
+    </div>
+  </div>
+</div>
+
+<div class="section" id="sec-baixa">
+  <div class="form-card">
+    <h3>Baixa por etiqueta UPC da balança</h3>
+    <div class="msg msg-ok" id="msg-baixa"></div>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:12px;">Digite o código EAN-13 da etiqueta gerada pela balança. O peso é lido automaticamente.</p>
+    <div class="frow frow2">
+      <div class="field"><label>Código UPC / EAN-13 da etiqueta</label>
+        <input type="text" id="baixa-upc" placeholder="ex: 2007700012340" maxlength="18" oninput="parsearUPC()">
+      </div>
+      <div class="field"><label>Ou peso/quant. manual</label>
+        <input type="number" id="baixa-manual" placeholder="Opcional" step="0.001" min="0" oninput="parsearUPC()">
+      </div>
+    </div>
+    <div class="upc-box" id="upc-box">
+      <div class="upc-row"><span>Produto:</span><span id="u-nome">—</span></div>
+      <div class="upc-row"><span>Peso da etiqueta:</span><span id="u-peso">—</span></div>
+      <div class="upc-row"><span>Estoque atual total (lotes):</span><span id="u-atual">—</span></div>
+      <div class="upc-row"><span>Estoque após baixa:</span><span id="u-apos" style="color:var(--yellow)">—</span></div>
+    </div>
+    <div class="frow frow2" style="margin-top:10px;">
+      <div class="field"><label>Responsável</label>
+        <input type="text" id="baixa-resp" placeholder="Nome do atendente">
+      </div>
+    </div>
+    <button class="btn-primary" onclick="registrarBaixa()">Confirmar baixa</button>
+  </div>
+  <div class="form-card" style="margin-top:0;">
+    <h3>Padrão EAN-13 da sua balança</h3>
+    <div style="font-size:12px;color:var(--text2);line-height:1.8;">
+      <span style="color:var(--text);">2</span> + <span style="color:var(--blue);">CCCC</span> (4 dígitos código, zeros à esquerda) + <span style="color:var(--text3);">0</span> (fixo) + <span style="color:var(--green);">VVVVVV</span> (valor em centavos) + <span style="color:var(--text3);">D</span> (verificador)<br>
+      Ex: <span style="color:var(--text);">2</span><span style="color:var(--blue);">4346</span><span style="color:var(--text3);">0</span><span style="color:var(--green);">097184</span><span style="color:var(--text3);">8</span> = Queijo, R$ 971,84 ÷ R$ 59,99/kg = <strong style="color:var(--green);">16,200 kg</strong> &nbsp;|&nbsp;
+      <span style="color:var(--text);">2</span><span style="color:var(--blue);">0140</span><span style="color:var(--text3);">0</span><span style="color:var(--green);">018066</span><span style="color:var(--text3);">0</span> = Mortadela Ouro, R$ 180,66 ÷ R$ 36,99/kg = <strong style="color:var(--green);">4,884 kg</strong><br>
+      <span style="color:var(--yellow);">⚠ O preço/kg precisa estar cadastrado na aba <strong>Preços/kg</strong> para o cálculo funcionar.</span>
+    </div>
+  </div>
+</div>
+
+<div class="section" id="sec-precos">
+  <div class="form-card">
+    <h3>Preço por kg — usado para calcular o peso a partir do valor da etiqueta UPC</h3>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:14px;">Quando a balança grava o <strong style="color:var(--text);">valor total</strong> no código EAN, o sistema divide pelo preço/kg para descobrir o peso. Mantenha os preços atualizados sempre que houver reajuste.</p>
+    <div class="tbl-wrap">
+    <table>
+      <thead><tr>
+        <th style="width:35%">Produto</th>
+        <th style="width:12%">Código</th>
+        <th style="width:20%">Preço/kg atual</th>
+        <th style="width:33%">Alterar</th>
+      </tr></thead>
+      <tbody id="tbody-precos"></tbody>
+    </table>
+    </div>
+  </div>
+</div>
+
+<div class="section" id="sec-historico">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+    <span style="font-size:13px;font-weight:600;">Movimentações</span>
+    <button class="btn-danger" onclick="limparHistorico()">Limpar todo o histórico</button>
+  </div>
+  <div class="tbl-wrap">
+  <table>
+    <thead><tr>
+      <th style="width:16%">Data/Hora</th>
+      <th style="width:24%">Produto</th>
+      <th style="width:10%">Tipo</th>
+      <th style="width:12%">Qtd/Peso</th>
+      <th style="width:14%">Saldo após</th>
+      <th style="width:14%">Responsável</th>
+      <th style="width:10%">Ação</th>
+    </tr></thead>
+    <tbody id="tbody-historico">
+      </tbody>
+  </table>
+  </div>
+</div>
+</div>
+</div>
+
+<script>
+const PRODUTOS_BASE=[
+  {codigo:'79', nome:'PRESUNTO FATIADO',        precoKg:34.99, saldo:10.300, validade:'2026-07-13', min:1.0, unidade:'kg'},
+  {codigo:'206',nome:'MORTADELA BOLONHA KG',    precoKg:33.99, saldo:0.000,  validade:'',           min:1.0, unidade:'kg'},
+  {codigo:'140',nome:'MORTADELA BOLONHA OURO',  precoKg:36.99, saldo:19.500, validade:'2026-06-10', min:1.0, unidade:'kg'},
+  {codigo:'4346',nome:'QUEIJO MUSSARELA FATIADO',precoKg:59.99, saldo:112.900,validade:'2026-08-08', min:1.0, unidade:'kg'},
+  {codigo:'141',nome:'SALSICHA KG',             precoKg:14.99, saldo:33.600, validade:'2026-08-12', min:1.0, unidade:'kg'},
+  {codigo:'205',nome:'MORTADELA COMUM FATIADA', precoKg:14.99, saldo:0.000,  validade:'',           min:1.0, unidade:'kg'},
+];
+
+let estoque=[], historico=[], salvando=false;
+
+function setSaveStatus(txt,cor){
+  document.getElementById('save-txt').textContent=txt;
+  document.getElementById('save-dot').style.background=cor;
+}
+
+let pollingInterval = null;
+
+function carregar(){
+  setSaveStatus('Conectando à planilha...','#888');
+  fetch(SHEETS_API_URL)
+    .then(r => r.json())
+    .then(dados => {
+      estoque = (dados.estoque && dados.estoque.length) ? dados.estoque : PRODUTOS_BASE.map(p => ({...p}));
+      estoque = estoque.map(p => {
+        if (p.precoKg === undefined || p.precoKg === '') {
+          const base = PRODUTOS_BASE.find(b => b.codigo === p.codigo);
+          p.precoKg = base ? base.precoKg : 0;
+        }
+        return p;
+      });
+      historico = dados.historico || [];
+
+      // Se a planilha veio totalmente vazia, inicializa com os produtos padrão
+      if (!dados.estoque || !dados.estoque.length) {
+        salvar();
+      }
+
+      popularSelect();
+      renderEstoque();
+      renderPrecos();
+      renderHistorico();
+      atualizarSummary();
+      setSaveStatus('Online ✓', '#4caf50');
+
+      if (!pollingInterval) {
+        pollingInterval = setInterval(sincronizar, 20000); // re-sincroniza a cada 20s
+      }
+    })
+    .catch(e => {
+      console.error('Erro ao carregar da planilha:', e);
+      setSaveStatus('Erro de conexão', '#e05252');
+    });
+}
+
+function sincronizar(){
+  if (salvando) return; // evita sobrescrever uma edição em andamento
+  fetch(SHEETS_API_URL)
+    .then(r => r.json())
+    .then(dados => {
+      estoque = dados.estoque || [];
+      historico = dados.historico || [];
+      popularSelect();
+      renderEstoque();
+      renderPrecos();
+      renderHistorico();
+      atualizarSummary();
+      setSaveStatus('Online ✓', '#4caf50');
+    })
+    .catch(e => console.error('Erro na sincronização periódica:', e));
+}
+
+async function salvar(){
+  if(salvando)return;
+  salvando=true;
+  setSaveStatus('Salvando...','#888');
+  try{
+    await fetch(SHEETS_API_URL, {
+      method: 'POST',
+      headers: {'Content-Type': 'text/plain;charset=utf-8'}, // evita preflight CORS no Apps Script
+      body: JSON.stringify({estoque, historico})
+    });
+    setSaveStatus('Salvo ✓','#4caf50');
+  }catch(e){
+    console.error('Erro ao salvar na planilha:',e);
+    setSaveStatus('Erro ao salvar','#e05252');
+  }
+  salvando=false;
+}
+
+function switchTab(t){
+  document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.getElementById('tab-'+t).classList.add('active');
+  document.getElementById('sec-'+t).classList.add('active');
+}
+
+function statusVal(v){
+  if(!v)return'';
+  const hoje=new Date();hoje.setHours(0,0,0,0);
+  const d=new Date(v+'T00:00:00');
+  const diff=Math.ceil((d-hoje)/86400000);
+  if(diff<0)return'vencido';
+  if(diff<=3)return'vencendo';
+  return'ok';
+}
+
+function fmtData(iso){
+  if(!iso)return'—';
+  const[y,m,d]=iso.split('-');return d+'/'+m+'/'+y;
+}
+function fmtHora(ts){
+  const d=new Date(ts);
+  return d.toLocaleDateString('pt-BR')+' '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+}
+
+function renderEstoque(){
+  const tb=document.getElementById('tbody-estoque');
+  tb.innerHTML=estoque.map((p,i)=>{
+    const sv=statusVal(p.validade);
+    let vBadge='';
+    if(sv==='vencido')vBadge='&nbsp;<span class="badge b-venc">Vencido</span>';
+    else if(sv==='vencendo')vBadge='&nbsp;<span class="badge b-low">Vence em breve</span>';
+    let sBadge='';
+    if(p.saldo<=0)sBadge='<span class="badge b-zero">Zerado</span>';
+    else if(p.saldo<p.min)sBadge='<span class="badge b-low">Baixo</span>';
+    else sBadge='<span class="badge b-ok">OK</span>';
+    const nome=p.nome.length>22?p.nome.substring(0,20)+'...':p.nome;
+    const und=p.unidade||'kg';
+    return`<tr>
+      <td style="font-weight:600;" title="${p.nome}">${nome}</td>
+      <td style="color:var(--text2);">${p.codigo}</td>
+      <td style="font-weight:600;">${p.saldo.toFixed(3)} ${und}</td>
+      <td>${fmtData(p.validade)}${vBadge}</td>
+      <td>${sBadge}</td>
+      <td>
+        <button class="btn-sm" onclick="editarValidade(${i})">Validade</button>
+        <button class="btn-sm" onclick="editarProduto(${i})">Editar</button>
+        <button class="btn-sm" onclick="corrigirSaldo(${i})">Saldo</button>
+        <button class="btn-sm" style="background:var(--red-bg);color:var(--red-text);border-color:#5a2a2a;" onclick="excluirProduto(${i})">Excluir</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function editarValidade(i){
+  const v=prompt('Validade para '+estoque[i].nome+'\n(formato: dd/mm/aaaa)',fmtData(estoque[i].validade));
+  if(!v)return;
+  const pts=v.split('/');
+  if(pts.length===3){estoque[i].validade=pts[2]+'-'+pts[1]+'-'+pts[0];salvar();renderEstoque();atualizarSummary();}
+}
+
+function editarProduto(i){
+  const p=estoque[i];
+  const novoNome=prompt('Editar nome do produto:',p.nome);
+  if(novoNome===null)return;
+  const novoMinStr=prompt('Editar estoque mínimo:',p.min);
+  if(novoMinStr===null)return;
+  const novoMin=parseFloat(novoMinStr);
+  if(isNaN(novoMin))return alert('Estoque mínimo inválido.');
+  const novaUnidade=prompt('Editar unidade (ex: kg, un, pct):',p.unidade||'kg');
+  if(novaUnidade===null)return;
+
+  const codProd = p.codigo;
+  // Sincroniza o novo nome/mínimo/unidade em todos os lotes com o mesmo código
+  estoque.forEach(item => {
+    if(item.codigo === codProd){
+      item.nome=novoNome.trim().toUpperCase()||item.nome;
+      item.min=novoMin;
+      item.unidade=novaUnidade.trim().toLowerCase()||'kg';
+    }
+  });
+
+  popularSelect();
+  salvar();renderEstoque();atualizarSummary();
+}
+
+function corrigirSaldo(i){
+  const p=estoque[i];
+  const und=p.unidade||'kg';
+  const novoSaldoStr=prompt(`Corrigir saldo de ${p.nome} (Lote: ${fmtData(p.validade)}) de ${p.saldo.toFixed(3)} ${und} para:`,p.saldo);
+  if(novoSaldoStr===null)return;
+  const novoSaldo=parseFloat(novoSaldoStr);
+  if(isNaN(novoSaldo))return alert('Saldo informado é inválido.');
+  const resp=prompt('Responsável / Motivo do ajuste manual:','');
+
+  const antigoSaldo=p.saldo;
+  const diff=novoSaldo-antigoSaldo;
+  p.saldo=novoSaldo;
+
+  const totalConsolidado = estoque.filter(item => item.codigo === p.codigo).reduce((sum, item) => sum + item.saldo, 0);
+
+  historico.push({
+    ts:Date.now(),
+    tipo:diff>=0?'entrada':'baixa',
+    codigo:p.codigo,
+    nome:p.nome + (p.validade ? ' (LOTE '+fmtData(p.validade)+')' : ''),
+    peso:Math.abs(diff),
+    saldoApos:totalConsolidado,
+    resp:(resp?(resp+' (Ajuste)'):'Ajuste manual')
+  });
+
+  salvar();renderEstoque();atualizarSummary();renderHistorico();
+}
+
+function renderPrecos(){
+  const tb=document.getElementById('tbody-precos');
+  if(!tb)return;
+  const vistos = new Set();
+  let html = '';
+  estoque.forEach((p,i)=>{
+    // Agrupa e mostra apenas um item por código na aba de edição de preços
+    if(!vistos.has(p.codigo)){
+      vistos.add(p.codigo);
+      const preco=p.precoKg||0;
+      const semPreco=preco===0;
+      html += `<tr>
+        <td style="font-weight:600;" title="${p.nome}">${p.nome}</td>
+        <td style="color:var(--text2);">${p.codigo}</td>
+        <td style="font-weight:600;color:${semPreco?'var(--red)':'var(--green)'};">${semPreco?'<span class="badge b-zero">Não cadastrado</span>':'R$ '+preco.toFixed(2)+'/kg'}</td>
+        <td>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <input type="number" id="preco-inp-${i}" placeholder="ex: 29.90" step="0.01" min="0" value="${preco>0?preco:''}"
+              style="width:110px;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:4px;font-size:13px;">
+            <button class="btn-primary" style="padding:5px 14px;font-size:12px;" onclick="salvarPreco(${i})">Salvar</button>
+          </div>
+        </td>
+      </tr>`;
+    }
+  });
+  tb.innerHTML = html;
+}
+
+function salvarPreco(i){
+  const inp=document.getElementById('preco-inp-'+i);
+  const val=parseFloat(inp.value);
+  if(isNaN(val)||val<0)return alert('Preço inválido.');
+  
+  const codProd = estoque[i].codigo;
+  // Aplica o preço atualizado para todos os lotes ativos daquele mesmo produto
+  estoque.forEach(p => {
+    if(p.codigo === codProd) p.precoKg=val;
+  });
+
+  salvar();renderPrecos();
+  // feedback visual
+  inp.style.borderColor='var(--green)';
+  setTimeout(()=>{inp.style.borderColor='var(--border)';},1500);
+}
+
+function adicionarProduto(){
+  const cod=document.getElementById('add-codigo').value.trim();
+  const nome=document.getElementById('add-nome').value.trim().toUpperCase();
+  const und=document.getElementById('add-unidade').value;
+  const min=parseFloat(document.getElementById('add-min').value)||0;
+  const saldo=parseFloat(document.getElementById('add-saldo').value)||0;
+
+  if(!cod||!nome)return alert('Código e Nome do produto são obrigatórios.');
+  if(estoque.some(p=>p.codigo===cod))return alert('Já existe um produto com esse código no sistema.');
+
+  estoque.push({codigo:cod,nome,unidade:und,min,saldo,validade:'',precoKg:0});
+
+  document.getElementById('add-codigo').value='';
+  document.getElementById('add-nome').value='';
+  document.getElementById('add-min').value='1.0';
+  document.getElementById('add-saldo').value='0.0';
+
+  popularSelect();
+  salvar();renderEstoque();renderPrecos();atualizarSummary();
+}
+
+function excluirProduto(i){
+  if(confirm(`Tem certeza que deseja REMOVER este lote de ${estoque[i].nome} permanentemente?`)){
+    estoque.splice(i,1);
+    popularSelect();
+    salvar();renderEstoque();atualizarSummary();
+  }
+}
+
+function atualizarSummary(){
+  const total=estoque.length;
+  const zeros=estoque.filter(p=>p.saldo<=0).length;
+  const baixos=estoque.filter(p=>p.saldo>0&&p.saldo<p.min).length;
+  const venc=estoque.filter(p=>{const s=statusVal(p.validade);return s==='vencido'||s==='vencendo';}).length;
+  document.getElementById('s-total').textContent=total;
+  document.getElementById('s-ok').textContent=total-zeros-baixos;
+  document.getElementById('s-low').textContent=zeros+baixos;
+  const vEl=document.getElementById('s-venc');
+  vEl.textContent=venc;
+  vEl.className='val '+(venc>0?'val-red':'val-white');
+}
+
+function popularSelect(){
+  const sel=document.getElementById('ent-produto');
+  sel.innerHTML='<option value="">Selecione...</option>';
+  const vistos=new Set();
+  estoque.forEach((p,i)=>{
+    // Garante que o seletor de entrada mostre apenas uma vez cada nome de produto
+    if(!vistos.has(p.codigo)){
+      vistos.add(p.codigo);
+      const o=document.createElement('option');
+      o.value=i;o.textContent=p.nome;sel.appendChild(o);
+    }
+  });
+}
+
+function preencherEntrada(){
+  const i=document.getElementById('ent-produto').value;
+  document.getElementById('ent-codigo').value=i===''?'':estoque[i].codigo;
+}
+
+function mostrarMsg(id,tipo,txt){
+  const el=document.getElementById(id);
+  el.className='msg '+tipo+' show';el.textContent=txt;
+  setTimeout(()=>el.classList.remove('show'),4000);
+}
+
+function registrarEntrada(){
+  const idx=document.getElementById('ent-produto').value;
+  const peso=parseFloat(document.getElementById('ent-peso').value);
+  const val=document.getElementById('ent-validade').value;
+  const resp=document.getElementById('ent-resp').value.trim();
+  if(idx==='')return mostrarMsg('msg-entrada','msg-err','Selecione o produto.');
+  if(!peso||peso<=0)return mostrarMsg('msg-entrada','msg-err','Informe um peso válido.');
+  const i=parseInt(idx);
+  const baseProd=estoque[i];
+  const und=baseProd.unidade||'kg';
+
+  // Verifica se já existe um lote com o MESMO código e a MESMA validade exata
+  let loteExistente = estoque.find(p => p.codigo === baseProd.codigo && p.validade === val);
+
+  if (loteExistente) {
+    loteExistente.saldo = Math.round((loteExistente.saldo + peso) * 1000) / 1000;
+  } else {
+    // Se a validade for diferente e a linha atual já possuir estoque, gera um novo lote (nova linha)
+    if (baseProd.saldo > 0 && val && baseProd.validade !== val) {
+      estoque.push({
+        codigo: baseProd.codigo,
+        nome: baseProd.nome,
+        unidade: baseProd.unidade || 'kg',
+        min: baseProd.min || 1.0,
+        precoKg: baseProd.precoKg || 0,
+        saldo: peso,
+        validade: val
+      });
+    } else {
+      // Se a linha atual estiver zerada ou sem validade, reaproveita a linha existente
+      baseProd.saldo = Math.round((baseProd.saldo + peso) * 1000) / 1000;
+      if (val) baseProd.validade = val;
+    }
+  }
+
+  // Calcula o total consolidado global de todos os lotes juntos para registrar no histórico
+  const totalConsolidado = estoque.filter(p => p.codigo === baseProd.codigo).reduce((sum, p) => sum + p.saldo, 0);
+
+  historico.push({ts:Date.now(),tipo:'entrada',codigo:baseProd.codigo,nome:baseProd.nome,peso,saldoApos:totalConsolidado,resp});
+  
+  popularSelect();
+  salvar();renderEstoque();atualizarSummary();renderHistorico();renderPrecos();
+  mostrarMsg('msg-entrada','msg-ok','✓ Entrada de '+peso.toFixed(3)+' '+und+' registrada.');
+  document.getElementById('ent-peso').value='';
+  document.getElementById('ent-validade').value='';
+}
+
+function parsearUPC(){
+  const upc=document.getElementById('baixa-upc').value.replace(/\D/g,'');
+  const manual=parseFloat(document.getElementById('baixa-manual').value)||0;
+  const box=document.getElementById('upc-box');
+  if(upc.length<5&&!manual){box.classList.remove('show');return;}
+  let codInt='', pesoKg=0, valorReais=0;
+  if(upc.length===13 && upc.startsWith('2')){
+    codInt=parseInt(upc.substring(1,5)).toString();
+    valorReais=parseInt(upc.substring(6,12))/100;
+  } else {
+    codInt=upc;
+  }
+  const prod=estoque.find(p=>p.codigo===codInt||p.codigo===upc);
+  if(prod && valorReais>0 && prod.precoKg>0){
+    pesoKg=Math.round((valorReais/prod.precoKg)*1000)/1000;
+  }
+  const usar=pesoKg>0?pesoKg:manual;
+  const und=prod?(prod.unidade||'kg'):'kg';
+  document.getElementById('u-nome').textContent=prod?prod.nome:'Não encontrado (cód: '+codInt+')';
+  if(prod && valorReais>0 && prod.precoKg>0){
+    document.getElementById('u-peso').textContent=usar.toFixed(3)+' '+und+' (R$ '+valorReais.toFixed(2)+' ÷ R$ '+prod.precoKg.toFixed(2)+'/kg)';
+  } else if(prod && valorReais>0 && (!prod.precoKg||prod.precoKg===0)){
+    document.getElementById('u-peso').textContent='Preço/kg não cadastrado — informe manualmente';
+  } else {
+    document.getElementById('u-peso').textContent=usar>0?usar.toFixed(3)+' '+und:'— (informe manualmente)';
+  }
+  
+  // Mostra a soma consolidada de todos os lotes na simulação de baixa
+  const saldoTotal = prod ? estoque.filter(p=>p.codigo===prod.codigo).reduce((sum,p)=>sum+p.saldo,0) : 0;
+  document.getElementById('u-atual').textContent=prod?saldoTotal.toFixed(3)+' '+und:'—';
+  document.getElementById('u-apos').textContent=prod&&usar>0?Math.max(0,saldoTotal-usar).toFixed(3)+' '+und:'—';
+  box.classList.add('show');
+}
+
+function registrarBaixa(){
+  const upc=document.getElementById('baixa-upc').value.replace(/\D/g,'');
+  const manual=parseFloat(document.getElementById('baixa-manual').value)||0;
+  const resp=document.getElementById('baixa-resp').value.trim();
+  let codInt='', pesoKg=0, valorReais=0;
+  if(upc.length===13 && upc.startsWith('2')){
+    codInt=parseInt(upc.substring(1,5)).toString();
+    valorReais=parseInt(upc.substring(6,12))/100;
+  } else {
+    codInt=upc;
+  }
+  if(!upc)return mostrarMsg('msg-baixa','msg-err','Informe o código UPC.');
+  
+  // Obtém todos os lotes que possuem o código correspondente
+  let lotes = estoque.filter(p => p.codigo === codInt || p.codigo === upc);
+  if(lotes.length === 0)return mostrarMsg('msg-baixa','msg-err','Produto não encontrado. Código: '+codInt);
+  
+  if(valorReais>0 && lotes[0].precoKg>0){
+    pesoKg=Math.round((valorReais/lotes[0].precoKg)*1000)/1000;
+  } else {
+    pesoKg=manual;
+  }
+  if(!pesoKg||pesoKg<=0)return mostrarMsg('msg-baixa','msg-err','Peso não encontrado. Cadastre o preço/kg ou use o campo manual.');
+  
+  const und=lotes[0].unidade||'kg';
+  const codProd=lotes[0].codigo;
+  const nomeProd=lotes[0].nome;
+
+  // Ordenação PEPS / FEFO: Separa lotes com validade e ordena os que vencem primeiro à frente
+  let lotesComValidade = lotes.filter(l => l.validade);
+  let lotesSemValidade = lotes.filter(l => !l.validade);
+  
+  lotesComValidade.sort((a, b) => new Date(a.validade + 'T00:00:00') - new Date(b.validade + 'T00:00:00'));
+  let lotesOrdenados = [...lotesComValidade, ...lotesSemValidade];
+
+  let pesoFaltante = pesoKg;
+
+  // Vai debitando lote por lote sequencialmente
+  for (let lote of lotesOrdenados) {
+    if (pesoFaltante <= 0) break;
+    if (lote.saldo <= 0) continue;
+
+    let aBaixar = Math.min(lote.saldo, pesoFaltante);
+    lote.saldo = Math.round((lote.saldo - aBaixar) * 1000) / 1000;
+    pesoFaltante = Math.round((pesoFaltante - aBaixar) * 1000) / 1000;
+  }
+
+  // Se o estoque global não for o suficiente e ainda faltar peso, negativa o lote mais velho
+  if (pesoFaltante > 0) {
+    lotesOrdenados[0].saldo = Math.round((lotesOrdenados[0].saldo - pesoFaltante) * 1000) / 1000;
+  }
+
+  const totalConsolidado = estoque.filter(p => p.codigo === codProd).reduce((sum, p) => sum + p.saldo, 0);
+  historico.push({ts:Date.now(),tipo:'baixa',codigo:codProd,nome:nomeProd,peso:pesoKg,saldoApos:totalConsolidado,resp});
+  
+  salvar();renderEstoque();atualizarSummary();renderHistorico();
+  mostrarMsg('msg-baixa','msg-ok','✓ Baixa de '+pesoKg.toFixed(3)+' '+und+'. Saldo total: '+totalConsolidado.toFixed(3)+' '+und);
+  document.getElementById('baixa-upc').value='';
+  document.getElementById('baixa-manual').value='';
+  document.getElementById('upc-box').classList.remove('show');
+}
+
+function renderHistorico(){
+  const tb=document.getElementById('tbody-historico');
+  const rows=[...historico].reverse();
+  if(!rows.length){tb.innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--text3);padding:24px 0;">Nenhuma movimentação</td></tr>';return;}
+  tb.innerHTML=rows.map((r,i)=>{
+    const idxReal=historico.length-1-i;
+    const prod=estoque.find(p=>p.codigo===r.codigo);
+    const und=prod?(prod.unidade||'kg'):'kg';
+    return `<tr>
+      <td style="font-size:12px;color:var(--text2);">${fmtHora(r.ts)}</td>
+      <td style="font-weight:600;">${r.nome}</td>
+      <td><span class="badge ${r.tipo==='entrada'?'b-entry':'b-baixa'}">${r.tipo==='entrada'?'Entrada':'Baixa'}</span></td>
+      <td style="font-weight:600;color:${r.tipo==='entrada'?'var(--green)':'var(--yellow)'};">${r.tipo==='entrada'?'+':'-'}${Math.abs(r.peso).toFixed(3)}</td>
+      <td>${r.saldoApos.toFixed(3)} ${und}</td>
+      <td style="color:var(--text2);">${r.resp||'—'}</td>
+      <td><button class="btn-sm" style="background:var(--red-bg);color:var(--red-text);border-color:#5a2a2a;margin:0;" onclick="excluirItemHistorico(${idxReal})">Apagar</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function excluirItemHistorico(idx){
+  if(confirm('Tem certeza que deseja apagar permanentemente esse registro do histórico? (Nota: Isso não altera o saldo atual do estoque)')){
+    historico.splice(idx,1);
+    salvar();renderHistorico();
+  }
+}
+
+function limparHistorico(){
+  if(confirm('Limpar TODO o histórico de movimentações permanentemente?')){historico=[];salvar();renderHistorico();}
+}
+
+function exportarRelatorio(){
+  let txt='RELATÓRIO DE ESTOQUE DE FRIOS\n'+new Date().toLocaleDateString('pt-BR')+'\n\n';
+  txt+='Produto|Código|Estoque|Unidade|Validade|Status\n';
+  estoque.forEach(p=>{
+    const sv=statusVal(p.validade);
+    const st=p.saldo<=0?'Zerado':p.saldo<p.min?'Baixo':'OK';
+    const vObs=sv==='vencido'?' (VENCIDO)':sv==='vencendo'?' (VENCE EM BREVE)':'';
+    txt+=p.nome+'|'+p.codigo+'|'+p.saldo.toFixed(3)+'|'+(p.unidade||'kg')+'|'+fmtData(p.validade)+vObs+'|'+st+'\n';
+  });
+  txt+='\nHISTÓRICO DE MOVIMENTAÇÕES\n\n';
+  txt+='Data/Hora|Produto|Tipo|Quantidade|Saldo após|Responsável\n';
+  [...historico].reverse().forEach(r=>{
+    const prod=estoque.find(p=>p.codigo===r.codigo);
+    const und=prod?(prod.unidade||'kg'):'kg';
+    txt+=fmtHora(r.ts)+'|'+r.nome+'|'+(r.tipo==='entrada'?'Entrada':'Baixa')+'|'+(r.tipo==='entrada'?'+':'-')+Math.abs(r.peso).toFixed(3)+' '+und+'|'+r.saldoApos.toFixed(3)+' '+und+'|'+(r.resp||'—')+'\n';
+  });
+  const blob=new Blob([txt],{type:'text/plain;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='estoque_frios_'+new Date().toISOString().slice(0,10)+'.txt';
+  a.click();
+}
+
+function atualizarRelogio(){
+  document.getElementById('data-hora').textContent=new Date().toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'})+' — '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+}
+
+// carregar() é chamado assim que a página está pronta (ver <head>)
+atualizarRelogio();
+setInterval(atualizarRelogio,60000);
+</script>
+</body></html>
